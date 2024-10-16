@@ -3321,19 +3321,23 @@ setGeneric("labelTransfer",
 
 #' @rdname labelTransfer
 #' @export
-setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(x, y,
-    spat_unit = NULL,
-    feat_type = NULL,
-    labels,
-    k = 10,
-    name = paste0("trnsfr_", labels),
-    prob = TRUE,
-    reduction = "cells",
-    reduction_method = "pca",
-    reduction_name = "pca",
-    dimensions_to_use = 1:10,
-    return_gobject = TRUE,
-    ...) {
+setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
+        x, y,
+        spat_unit = NULL,
+        feat_type = NULL,
+        labels,
+        k = 10,
+        name = paste0("trnsfr_", labels),
+        prob = TRUE,
+        co_filter_params = list(),
+        co_norm_params = list(),
+
+        reduction_name = NULL,
+        reduction_method = NULL,
+        dimensions_to_use = NULL,
+        return_gobject = TRUE,
+        ...
+) {
     # NSE vars
     temp_name <- cell_ID <- temp_name_prob <- NULL
 

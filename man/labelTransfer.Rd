@@ -16,10 +16,11 @@ voting}
   k = 10,
   name = paste0("trnsfr_", labels),
   prob = TRUE,
-  reduction = "cells",
-  reduction_method = "pca",
-  reduction_name = "pca",
-  dimensions_to_use = 1:10,
+  co_filter_params = list(),
+  co_norm_params = list(),
+  reduction_name = NULL,
+  reduction_method = NULL,
+  dimensions_to_use = NULL,
   return_gobject = TRUE,
   ...
 )
