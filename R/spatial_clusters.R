@@ -43,14 +43,13 @@
 #' @param g igraph
 #' @param clus_name character. name to assign column of clustering info
 #' @param all_ids (optional) character vector with all ids
-#' @param missing_id_name character and name for vertices that were missing 
-#' from g
-#' @returns data.table
+#' @returns `data.table` with two columns. 1st is "cell_ID", second is named with
+#' `clus_name` and is of type `numeric`
 #' @keywords internal
+#' @noRd
 .igraph_vertex_membership <- function(g,
     clus_name,
-    all_ids = NULL,
-    missing_id_name) {
+    all_ids = NULL) {
     # get membership
     membership <- igraph::components(g)$membership %>%
         data.table::as.data.table(keep.rownames = TRUE)
@@ -60,7 +59,9 @@
     if (!is.null(all_ids)) {
         missing_ids <- all_ids[!all_ids %in% igraph::V(g)$name]
         missing_membership <- data.table::data.table(
-            "cell_ID" = missing_ids, "cluster_name" = missing_id_name)
+            "cell_ID" = missing_ids,
+            "cluster_name" = 0
+        )
         data.table::setnames(missing_membership, c("cell_ID", clus_name))
         membership <- data.table::rbindlist(
             list(membership, missing_membership))
@@ -80,14 +81,11 @@
 #' @param cluster_col character. Column in metadata containing original
 #' clustering
 #' @param split_clus_name character. Name to assign the split cluster results
-#' @param include_all_ids Boolean. Include all ids, including vertex ids not 
+#' @param include_all_ids logical. Include all ids, including vertex ids not
 #' found in the spatial network
-#' @param missing_id_name Character. Name for vertices that were missing from
-#' spatial network
-#' @param return_gobject Boolean. Return giotto object
+#' @param return_gobject logical. Return giotto object
 #' @returns giotto object with cluster annotations
 #' @examples
-#' library(Giotto)
 #' g <- GiottoData::loadGiottoMini("vizgen")
 #' activeSpatUnit(g) <- "aggregate"
 #' spatPlot2D(g, cell_color = "leiden_clus")
@@ -105,7 +103,6 @@ spatialSplitCluster <- function(gobject,
     spatial_network_name = "Delaunay_network",
     cluster_col,
     split_clus_name = paste0(cluster_col, "_split"),
-    include_all_ids = TRUE,
     missing_id_name = "not_connected",
     return_gobject = TRUE) {
     # NSE vars
@@ -156,23 +153,13 @@ spatialSplitCluster <- function(gobject,
     )
 
     # get new clusterings
-    if (isTRUE(include_all_ids)) {
-        # include all cell IDs
-        all_ids <- unique(cell_meta$cell_ID)
-        new_clus_dt <- .igraph_vertex_membership(
-            g = g,
-            clus_name = split_clus_name,
-            all_ids = all_ids,
-            missing_id_name = missing_id_name
-        )
-    } else {
-        # only IDs present in graph
-        new_clus_dt <- .igraph_vertex_membership(
-            g = g,
-            clus_name = split_clus_name,
-            all_ids = NULL
-        )
-    }
+    # spatially unconnected nodes (if any) will always be returned as 0
+    all_ids <- unique(cell_meta$cell_ID)
+    new_clus_dt <- .igraph_vertex_membership(
+        g = g,
+        clus_name = split_clus_name,
+        all_ids <- all_ids
+    )
 
     if (isTRUE(return_gobject)) {
         gobject <- addCellMetadata(
@@ -197,11 +184,12 @@ spatialSplitCluster <- function(gobject,
 #' @inheritParams data_access_params
 #' @param spatial_network_name character. Name of spatial network to use
 #' @param core_id_name metadata column name for the core information
-#' @param include_all_ids Boolean. Include all ids, including vertex ids not 
+#' @param id_fmt character. [sprintf] formatting to use for core ids
+#' @param include_all_ids logical. Include all ids, including vertex ids not
 #' found in the spatial network
-#' @param missing_id_name Character. Name for vertices that were missing from
+#' @param missing_id_name character. Name for vertices that were missing from
 #' spatial network
-#' @param return_gobject Boolean. Return giotto object
+#' @param return_gobject logical. Return giotto object
 #' @returns cluster annotations
 #' @export
 identifyTMAcores <- function(gobject,
@@ -209,6 +197,7 @@ identifyTMAcores <- function(gobject,
     feat_type = NULL,
     spatial_network_name = "Delaunay_network",
     core_id_name = "core_id",
+    id_fmt = "%d",
     include_all_ids = TRUE,
     missing_id_name = "not_connected",
     return_gobject = TRUE) {
@@ -225,6 +214,7 @@ identifyTMAcores <- function(gobject,
         feat_type = feat_type
     )
 
+    # get data
     cell_meta <- getCellMetadata(
         gobject = gobject,
         spat_unit = spat_unit,
@@ -242,35 +232,43 @@ identifyTMAcores <- function(gobject,
         verbose = FALSE,
     )
 
-
     g <- GiottoClass::spat_net_to_igraph(sn)
     # convert spatialNetworkObject to igraph
 
-
-    # get new clusterings
+    # get new clusterings as initial indices
+    # these indices may need repairs and updates to be finalized
+    ivm_params <- list(
+        g = g, clus_name = "init_idx"
+    )
     if (isTRUE(include_all_ids)) {
         # include all cell IDs
         all_ids <- unique(cell_meta$cell_ID)
-        new_clus_dt <- .igraph_vertex_membership(
-            g = g,
-            clus_name = core_id_name,
-            all_ids = all_ids,
-            missing_id_name = missing_id_name
-        )
+        ivm_params$all_ids <- all_ids
     } else {
         # only IDs present in graph
-        new_clus_dt <- .igraph_vertex_membership(
-            g = g,
-            clus_name = core_id_name,
-            all_ids = NULL
-        )
+        ivm_params$all_ids <- NULL
     }
+
+    new_clus_dt <- do.call(.igraph_vertex_membership, args = ivm_params)
+    # connected nodes
+    con <- new_clus_dt[init_idx > 0]
+    # spatially disconnected observations (not connected to a group of nodes)
+    dcon <- new_clus_dt[init_idx == 0]
+
+    # apply core_id_name
+    con[, (core_id_name) := sprintf(id_fmt, init_idx)]
+    dcon[, (core_id_name) := missing_id_name]
+
+    res <- rbind(
+        con[, .SD, .SDcols = c("cell_ID", core_id_name)],
+        dcon[, .SD, .SDcols = c("cell_ID", core_id_name)]
+    )
 
     if (isTRUE(return_gobject)) {
         gobject <- addCellMetadata(
             gobject,
             spat_unit = spat_unit,
-            new_metadata = new_clus_dt,
+            new_metadata = res,
             by_column = TRUE,
             column_cell_ID = "cell_ID"
         )
