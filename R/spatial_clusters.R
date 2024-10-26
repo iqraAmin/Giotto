@@ -117,6 +117,8 @@ spatialSplitCluster <- function(gobject,
 #' an unconnected group.
 #' @param repair_split_cores logical. Attempt to repair core IDs when a core
 #' is split down the middle and detected as two different cores.
+#' @param repair_split_test_angles angles to rotate through when testing for
+#' split cores. If cores are very close together, 0 and 90 are safest.
 #' @param return_gobject logical. Return giotto object
 #' @returns cluster annotations
 #' @export
@@ -130,6 +132,7 @@ identifyTMAcores <- function(gobject,
     missing_id_name = "not_connected",
     min_nodes = 5,
     repair_split_cores = TRUE,
+    repair_split_test_angles = c(0, 90),
     return_gobject = TRUE) {
     # NSE vars
     cell_ID <- NULL
@@ -200,7 +203,7 @@ identifyTMAcores <- function(gobject,
         # find ext of cores
         # iterate through angles to catch cases where extents do not
         # bridge across split.
-        ovlp_reps <- lapply(c(0, 45, 90), function(rangle) {
+        ovlp_reps <- lapply(repair_split_test_angles, function(rangle) {
             sl_rot <- spin(sl, rangle)
 
             # get ext poly of rotated cores

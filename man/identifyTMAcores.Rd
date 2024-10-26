@@ -15,6 +15,7 @@ identifyTMAcores(
   missing_id_name = "not_connected",
   min_nodes = 5,
   repair_split_cores = TRUE,
+  repair_split_test_angles = c(0, 90),
   return_gobject = TRUE
 )
 }
@@ -42,6 +43,9 @@ an unconnected group.}
 
 \item{repair_split_cores}{logical. Attempt to repair core IDs when a core
 is split down the middle and detected as two different cores.}
+
+\item{repair_split_test_angles}{angles to rotate through when testing for
+split cores. If cores are very close together, 0 and 90 are safest.}
 
 \item{return_gobject}{logical. Return giotto object}
 }
