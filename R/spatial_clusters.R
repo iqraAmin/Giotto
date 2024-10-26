@@ -115,10 +115,10 @@ spatialSplitCluster <- function(gobject,
 #' a core.
 #' @param min_nodes numeric. Minimal number of nodes to not be considered
 #' an unconnected group.
-#' @param repair_split_cores logical. Attempt to repair core IDs when a core
+#' @param join_split_cores logical. Attempt to repair core IDs when a core
 #' is split down the middle and detected as two different cores.
-#' @param repair_split_test_angles angles to rotate through when testing for
-#' split cores. If cores are very close together, 0 and 90 are safest.
+#' @param join_tolerance numeric. Max ratio allowed relative to previous max
+#' core convex hull area when determining if a pair of cores should be joined.
 #' @param return_gobject logical. Return giotto object
 #' @returns cluster annotations
 #' @export
@@ -131,8 +131,8 @@ identifyTMAcores <- function(gobject,
     include_all_ids = TRUE,
     missing_id_name = "not_connected",
     min_nodes = 5,
-    repair_split_cores = TRUE,
-    repair_split_test_angles = c(0, 90),
+    join_split_cores = TRUE,
+    join_tolerance = 1.2,
     return_gobject = TRUE) {
     # NSE vars
     cell_ID <- NULL
@@ -197,17 +197,27 @@ identifyTMAcores <- function(gobject,
     con <- con[init_idx != 0]
 
     # fix split cores
-    if (repair_split_cores) {
+    if (join_split_cores) {
         sl <- getSpatialLocations(gobject, spat_unit = spat_unit)
+        con_init_idx_uniq <- sort(unique(con$init_idx))
+
+        areas <- vapply(
+            FUN.VALUE = numeric(1L), con_init_idx_uniq, function(core_id) {
+                sl[con[init_idx == core_id, cell_ID]] |>
+                    convHull() |>
+                    area()
+            }
+        )
+        max_area <- max(areas)
 
         # find ext of cores
         # iterate through angles to catch cases where extents do not
         # bridge across split.
-        ovlp_reps <- lapply(repair_split_test_angles, function(rangle) {
+        ovlp_reps <- lapply(c(0, 22.5, 45), function(rangle) {
             sl_rot <- spin(sl, rangle)
 
             # get ext poly of rotated cores
-            epoly_list <- lapply(unique(con$init_idx), function(core_id) {
+            epoly_list <- lapply(con_init_idx_uniq, function(core_id) {
                 sl_rot[con[init_idx == core_id, cell_ID]] |>
                     ext() |>
                     as.polygons()
@@ -215,10 +225,11 @@ identifyTMAcores <- function(gobject,
             poly <- do.call(rbind, epoly_list)
 
             # test for overlaps
-            ovlps <- relate(poly, relation = "overlaps", pairs = TRUE) |>
+            ovlp <- relate(poly, relation = "overlaps", pairs = TRUE) |>
                 # determine sorted pairs of overlaps
                 apply(MARGIN = 2, sort) |>
                 t()
+            return(ovlp)
         })
         # combine test reps
         ovlps <- do.call(rbind, ovlp_reps) |>
@@ -228,6 +239,13 @@ identifyTMAcores <- function(gobject,
         for (pair_i in nrow(ovlps)) {
             idx_1 <- ovlps[pair_i, 1L]
             idx_2 <- ovlps[pair_i, 2L]
+            # ignore hits from two full cores
+            # combined area of IDs to join cannot be greater than join_tolerance of max_area
+            if ((areas[[idx_1]] + areas[[idx_2]]) >
+                (join_tolerance * max_area)) {
+                next
+            }
+
             con[init_idx == idx_2, init_idx := idx_1]
         }
 
@@ -340,6 +358,7 @@ identifyTMAcores <- function(gobject,
 
     return(membership)
 }
+
 
 
 

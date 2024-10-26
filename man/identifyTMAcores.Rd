@@ -14,8 +14,8 @@ identifyTMAcores(
   include_all_ids = TRUE,
   missing_id_name = "not_connected",
   min_nodes = 5,
-  repair_split_cores = TRUE,
-  repair_split_test_angles = c(0, 90),
+  join_split_cores = TRUE,
+  join_tolerance = 1.2,
   return_gobject = TRUE
 )
 }
@@ -41,11 +41,11 @@ a core.}
 \item{min_nodes}{numeric. Minimal number of nodes to not be considered
 an unconnected group.}
 
-\item{repair_split_cores}{logical. Attempt to repair core IDs when a core
+\item{join_split_cores}{logical. Attempt to repair core IDs when a core
 is split down the middle and detected as two different cores.}
 
-\item{repair_split_test_angles}{angles to rotate through when testing for
-split cores. If cores are very close together, 0 and 90 are safest.}
+\item{join_tolerance}{numeric. Max ratio allowed relative to previous max
+core convex hull area when determining if a pair of cores should be joined.}
 
 \item{return_gobject}{logical. Return giotto object}
 }
