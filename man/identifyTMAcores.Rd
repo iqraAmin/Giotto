@@ -10,8 +10,11 @@ identifyTMAcores(
   feat_type = NULL,
   spatial_network_name = "Delaunay_network",
   core_id_name = "core_id",
+  id_fmt = "\%d",
   include_all_ids = TRUE,
   missing_id_name = "not_connected",
+  min_nodes = 5,
+  repair_split_cores = TRUE,
   return_gobject = TRUE
 )
 }
@@ -26,13 +29,21 @@ identifyTMAcores(
 
 \item{core_id_name}{metadata column name for the core information}
 
-\item{include_all_ids}{Boolean. Include all ids, including vertex ids not 
+\item{id_fmt}{character. [sprintf] formatting to use for core ids}
+
+\item{include_all_ids}{logical. Include all ids, including vertex ids not
 found in the spatial network}
 
-\item{missing_id_name}{Character. Name for vertices that were missing from
-spatial network}
+\item{missing_id_name}{character. Name for nodes that are not connected to
+a core.}
 
-\item{return_gobject}{Boolean. Return giotto object}
+\item{min_nodes}{numeric. Minimal number of nodes to not be considered
+an unconnected group.}
+
+\item{repair_split_cores}{logical. Attempt to repair core IDs when a core
+is split down the middle and detected as two different cores.}
+
+\item{return_gobject}{logical. Return giotto object}
 }
 \value{
 cluster annotations

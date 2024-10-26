@@ -1,79 +1,3 @@
-#' @title Remove hetero edges from igraph
-#' @name .igraph_remove_hetero_edges
-#' @description
-#' Given an igraph `g` and set of node attributes `clus_att` that encode
-#' different spatial clusters, remove edges that connect non-similar nodes.
-#' This can be used when data is already clustered, but these clusters should
-#' be further broken up based on whether they are spatially touching.
-#' @param g igraph object
-#' @param clus_attr character. A categorical node attribute
-#' @md
-#' @returns igraph
-#' @keywords internal
-.igraph_remove_hetero_edges <- function(g, clus_attr) {
-    clus_attr_values <- igraph::vertex_attr(g, name = clus_attr)
-
-    for (n in unique(clus_attr_values)) {
-        # find all vertices of the attribute
-        nv <- igraph::V(g)$name[clus_attr_values == n]
-
-        # find edges that include these vertices
-        n_all_edges <- igraph::E(g)[.inc(igraph::V(g)[nv])] %>%
-            igraph::as_ids()
-
-        # find edges associated with only these vertices
-        n_internal_edges <- igraph::E(g)[nv %--% nv] %>%
-            igraph::as_ids()
-
-        het_edges <- n_all_edges[!n_all_edges %in% n_internal_edges]
-
-        g <- igraph::delete_edges(g, edges = het_edges)
-    }
-
-    g
-}
-
-
-
-
-#' @title igraph vertex membership
-#' @name .igraph_vertex_membership
-#' @description
-#' Get which weakly connected set of vertices each vertex is part of
-#' @param g igraph
-#' @param clus_name character. name to assign column of clustering info
-#' @param all_ids (optional) character vector with all ids
-#' @returns `data.table` with two columns. 1st is "cell_ID", second is named with
-#' `clus_name` and is of type `numeric`
-#' @keywords internal
-#' @noRd
-.igraph_vertex_membership <- function(g,
-    clus_name,
-    all_ids = NULL) {
-    # get membership
-    membership <- igraph::components(g)$membership %>%
-        data.table::as.data.table(keep.rownames = TRUE)
-    data.table::setnames(membership, c("cell_ID", clus_name))
-
-    # add vertices that were missing from g back
-    if (!is.null(all_ids)) {
-        missing_ids <- all_ids[!all_ids %in% igraph::V(g)$name]
-        missing_membership <- data.table::data.table(
-            "cell_ID" = missing_ids,
-            "cluster_name" = 0
-        )
-        data.table::setnames(missing_membership, c("cell_ID", clus_name))
-        membership <- data.table::rbindlist(
-            list(membership, missing_membership))
-    }
-
-    return(membership)
-}
-
-
-
-
-
 #' @title Split cluster annotations based on a spatial network
 #' @name spatialSplitCluster
 #' @inheritParams data_access_params
@@ -187,8 +111,12 @@ spatialSplitCluster <- function(gobject,
 #' @param id_fmt character. [sprintf] formatting to use for core ids
 #' @param include_all_ids logical. Include all ids, including vertex ids not
 #' found in the spatial network
-#' @param missing_id_name character. Name for vertices that were missing from
-#' spatial network
+#' @param missing_id_name character. Name for nodes that are not connected to
+#' a core.
+#' @param min_nodes numeric. Minimal number of nodes to not be considered
+#' an unconnected group.
+#' @param repair_split_cores logical. Attempt to repair core IDs when a core
+#' is split down the middle and detected as two different cores.
 #' @param return_gobject logical. Return giotto object
 #' @returns cluster annotations
 #' @export
@@ -200,6 +128,8 @@ identifyTMAcores <- function(gobject,
     id_fmt = "%d",
     include_all_ids = TRUE,
     missing_id_name = "not_connected",
+    min_nodes = 5,
+    repair_split_cores = TRUE,
     return_gobject = TRUE) {
     # NSE vars
     cell_ID <- NULL
@@ -255,6 +185,51 @@ identifyTMAcores <- function(gobject,
     # spatially disconnected observations (not connected to a group of nodes)
     dcon <- new_clus_dt[init_idx == 0]
 
+    # min nodes filter
+    con_nodes <- con[, .N, by = init_idx]
+    small_con_idx <- con_nodes[N < min_nodes, init_idx]
+    # shift filtered values to dcon (disconnected)
+    con[init_idx %in% small_con_idx, init_idx := 0]
+    dcon <- rbind(dcon, con[init_idx == 0])
+    con <- con[init_idx != 0]
+
+    # fix split cores
+    if (repair_split_cores) {
+        sl <- getSpatialLocations(gobject, spat_unit = spat_unit)
+
+        # find ext of cores
+        # iterate through angles to catch cases where extents do not
+        # bridge across split.
+        ovlp_reps <- lapply(c(0, 45, 90), function(rangle) {
+            sl_rot <- spin(sl, rangle)
+
+            # get ext poly of rotated cores
+            epoly_list <- lapply(unique(con$init_idx), function(core_id) {
+                sl_rot[con[init_idx == core_id, cell_ID]] |>
+                    ext() |>
+                    as.polygons()
+            })
+            poly <- do.call(rbind, epoly_list)
+
+            # test for overlaps
+            ovlps <- relate(poly, relation = "overlaps", pairs = TRUE) |>
+                # determine sorted pairs of overlaps
+                apply(MARGIN = 2, sort) |>
+                t()
+        })
+        # combine test reps
+        ovlps <- do.call(rbind, ovlp_reps) |>
+            unique()
+
+        # update ids based on test
+        for (pair_i in nrow(ovlps)) {
+            idx_1 <- ovlps[pair_i, 1L]
+            idx_2 <- ovlps[pair_i, 2L]
+            con[init_idx == idx_2, init_idx := idx_1]
+        }
+
+    }
+
     # apply core_id_name
     con[, (core_id_name) := sprintf(id_fmt, init_idx)]
     dcon[, (core_id_name) := missing_id_name]
@@ -277,3 +252,92 @@ identifyTMAcores <- function(gobject,
         new_clus_dt
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+# internals ####
+
+#' @title Remove hetero edges from igraph
+#' @name .igraph_remove_hetero_edges
+#' @description
+#' Given an igraph `g` and set of node attributes `clus_att` that encode
+#' different spatial clusters, remove edges that connect non-similar nodes.
+#' This can be used when data is already clustered, but these clusters should
+#' be further broken up based on whether they are spatially touching.
+#' @param g igraph object
+#' @param clus_attr character. A categorical node attribute
+#' @returns igraph
+#' @noRd
+#' @keywords internal
+.igraph_remove_hetero_edges <- function(g, clus_attr) {
+    clus_attr_values <- igraph::vertex_attr(g, name = clus_attr)
+
+    for (n in unique(clus_attr_values)) {
+        # find all vertices of the attribute
+        nv <- igraph::V(g)$name[clus_attr_values == n]
+
+        # find edges that include these vertices
+        n_all_edges <- igraph::E(g)[.inc(igraph::V(g)[nv])] %>%
+            igraph::as_ids()
+
+        # find edges associated with only these vertices
+        n_internal_edges <- igraph::E(g)[nv %--% nv] %>%
+            igraph::as_ids()
+
+        het_edges <- n_all_edges[!n_all_edges %in% n_internal_edges]
+
+        g <- igraph::delete_edges(g, edges = het_edges)
+    }
+
+    g
+}
+
+
+
+
+#' @title igraph vertex membership
+#' @name .igraph_vertex_membership
+#' @description
+#' Get which weakly connected set of vertices each vertex is part of
+#' @param g igraph
+#' @param clus_name character. name to assign column of clustering info
+#' @param all_ids (optional) character vector with all ids
+#' @returns `data.table` with two columns. 1st is "cell_ID", second is named with
+#' `clus_name` and is of type `numeric`
+#' @keywords internal
+#' @noRd
+.igraph_vertex_membership <- function(g,
+                                      clus_name,
+                                      all_ids = NULL) {
+    # get membership
+    membership <- igraph::components(g)$membership %>%
+        data.table::as.data.table(keep.rownames = TRUE)
+    data.table::setnames(membership, c("cell_ID", clus_name))
+
+    # add vertices that were missing from g back
+    if (!is.null(all_ids)) {
+        missing_ids <- all_ids[!all_ids %in% igraph::V(g)$name]
+        missing_membership <- data.table::data.table(
+            "cell_ID" = missing_ids,
+            "cluster_name" = 0
+        )
+        data.table::setnames(missing_membership, c("cell_ID", clus_name))
+        membership <- data.table::rbindlist(
+            list(membership, missing_membership))
+    }
+
+    return(membership)
+}
+
+
+
+
