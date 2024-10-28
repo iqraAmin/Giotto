@@ -6,7 +6,6 @@
 * `runNMF()` implementation that works via RcppML
 
 ## Changes
-* `screePlot()` `name` param changed to `dim_reduction_name`
 * `runWNN()` and `runIntegratedUMAP()` arguments were updated to make the function flexible to handle any number of modalities.
 * update `jackstrawPlot()` to make more flexible and efficient. Changed default params for `scaling`, `centering`, and `feats_to_use` to match `runPCA()`
 * change warning when reduction "feats" is selected in `runtSNE()` to error to avoid accidentally wiping the `giotto` object.
