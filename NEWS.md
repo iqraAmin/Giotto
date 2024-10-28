@@ -1,4 +1,4 @@
-# Giotto 4.1.3
+# Giotto 4.1.3 (2024/10/27)
 
 ## New
 * Add `giottoToAnndataZarr()` to create a local anndata zarr folder and interact with the vitessceR package.
