@@ -2,10 +2,15 @@
 
 ## New
 * Add `giottoToAnndataZarr()` to create a local anndata zarr folder and interact with the vitessceR package.
+* `reduceDims()` API function for dimension reductions
+* `runNMF()` implementation that works via RcppML
 
 ## Changes
+* `screePlot()` `name` param changed to `dim_reduction_name`
 * `runWNN()` and `runIntegratedUMAP()` arguments were updated to make the function flexible to handle any number of modalities.
 * update `jackstrawPlot()` to make more flexible and efficient. Changed default params for `scaling`, `centering`, and `feats_to_use` to match `runPCA()`
+* change warning when reduction "feats" is selected in `runtSNE()` to error to avoid accidentally wiping the `giotto` object.
+
 
 # Giotto 4.1.2
 
@@ -26,7 +31,11 @@
 * move `progressr` and `jsonlite` dependencies to GiottoUtils v0.1.12
 * remove `reshape2` dependency.
 
+## Bug fixes
+* `processGiotto()` can now skip adjust step by default
+
 ## New
+* `identifyTMAcores()` for assigning IDs to tissue microarray spatial data.
 * `labelTransfer()` for transferring labels between giotto objects or subsets thereof. Supercedes `doClusterProjection()`
 
 # Giotto 4.1.1
