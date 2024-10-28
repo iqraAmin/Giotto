@@ -3228,11 +3228,11 @@ getDendrogramSplits <- function(gobject,
 
     if (show_dend == TRUE) {
         # plot dendrogram
-        graphics::plot(cordend)
+        plot(cordend)
 
         # add horizontal lines
         if (!is.null(h)) {
-            graphics::abline(h = h, col = h_color)
+            abline(h = h, col = h_color)
         }
     }
 

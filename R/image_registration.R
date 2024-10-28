@@ -705,10 +705,10 @@ registerGiottoObjectListRvision <- function(gobject_list = gobject_list,
 
     ## 4. Compute transformations
     # Choose reference image
-    refImage <- unreg_images[[base::floor(length(unreg_images) / 2)]]
+    refImage <- unreg_images[[floor(length(unreg_images) / 2)]]
 
     # Compute ECC transforms
-    transfs <- base::vector(mode = "list", length = length(unreg_images))
+    transfs <- vector(mode = "list", length = length(unreg_images))
     for (i in seq_along(unreg_images)) {
         transfs[[i]] <- Rvision::findTransformECC(
             refImage, unreg_images[[i]],
