@@ -3,6 +3,7 @@
 
 ## Changes
 * apply a modifier of 0.8461538 to visium spot diameter to reflect actual spot size
+* deprecate param `resolution_parameter` in favor of `resolution` for `doLeidenClusterIgraph()`
 
 # Giotto 4.1.3 (2024/10/27)
 
