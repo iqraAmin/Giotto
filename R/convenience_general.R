@@ -782,9 +782,11 @@ addVisiumPolygons <- function(
     if (inherits(spatlocs, "spatLocsObj")) {
         spatlocs <- spatlocs[]
     }
+    
+    spot_adj <- 55 / 65
 
     vis_spot_poly <- GiottoClass::circleVertices(
-        radius = json_scalefactors$spot_diameter_fullres / 2
+        radius = json_scalefactors$spot_diameter_fullres / 2 * spot_adj
     )
 
     GiottoClass::polyStamp(

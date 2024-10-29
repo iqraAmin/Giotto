@@ -1,3 +1,9 @@
+
+# Giotto 4.1.4
+
+## Changes
+* apply a modifier of 0.8461538 to visium spot diameter to reflect actual spot size
+
 # Giotto 4.1.3 (2024/10/27)
 
 ## New
