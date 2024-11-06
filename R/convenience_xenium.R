@@ -1065,7 +1065,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
 
 .xenium_image <- function(path,
     name,
-    output_dir = "default", # new tif_exports folder one layer down
+    output_dir,
     micron,
     negative_y = TRUE,
     flip_vertical = FALSE,
@@ -1082,6 +1082,8 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
 
     # set default if still missing
     if (missing(name)) name <- "image"
+    # default = new tif_exports folder one layer down
+    if (missing(output_dir)) output_dir <- "default"
     
     # [names]
     if (length(name) != length(path) &&
