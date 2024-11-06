@@ -1014,6 +1014,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
     fname <- "rna"
     if (length(names(ex_list)) > 1L) fname <- names(ex_list)
     fname[fname == "Gene Expression"] <- "rna"
+    fname <- gsub(" ", "_", fname) # replace " " with "_" characters
 
     # lapply to process more than one if present
     eo_list <- lapply(seq_along(ex_list), function(ex_i) {
