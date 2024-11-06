@@ -1065,7 +1065,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
 
 .xenium_image <- function(path,
     name,
-    output_dir,
+    output_dir = "default", # new tif_exports folder one layer down
     micron,
     negative_y = TRUE,
     flip_vertical = FALSE,
@@ -1180,7 +1180,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
     # .ome.tif images. May be related to JP2OpenJPEG driver but even loading
     # this does not seem to fix it.
     if ("ome" %in% file_extension(path)) {
-        if (missing(output_dir)) {
+        if (output_dir == "default") {
             # default output dir is a new folder under the same directory
             output_dir <- file.path(dirname(path), "tif_exports")
         }
