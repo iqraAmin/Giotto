@@ -315,7 +315,7 @@ setMethod(
         obj@calls$load_expression <- expr_fun
 
         # load image call
-        img_fun <- function(path,
+        img_fun <- function(path = img_focus_path,
     name = "image",
     output_dir,
     micron = obj@micron,
@@ -1082,6 +1082,16 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
 
     # set default if still missing
     if (missing(name)) name <- "image"
+    
+    # [names]
+    if (length(name) != length(path) &&
+        length(name) != 1) {
+        stop("length of `name` should be same as length of `path`")
+    }
+    if (length(name) == 1 &&
+        length(path) > 1) {
+        name <- sprintf("%s_%d", name, seq_along(path))
+    }
 
     # [directory input] -> load as individual image paths
     # these need to be expanded then appended to running named list of images
@@ -1109,19 +1119,11 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
             name <- c(name, dfn_i)
         }
     }
-
+    
     # [paths]
     # check files exist
     vapply(path, checkmate::assert_file_exists, FUN.VALUE = character(1L))
-    # names
-    if (length(name) != length(path) &&
-        length(name) != 1) {
-        stop("length of `name` should be same as length of `path`")
-    }
-    if (length(name) == 1 &&
-        length(path) > 1) {
-        name <- sprintf("%s_%d", name, seq_along(path))
-    }
+
     # micron
     checkmate::assert_numeric(micron)
 
