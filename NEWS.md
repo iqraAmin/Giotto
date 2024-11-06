@@ -1,11 +1,27 @@
-# Giotto 4.1.3
+
+# Giotto 4.1.4 (2024/10/30)
+
+## Changes
+* `createGiottoVisiumObject()` apply a modifier of 0.8461538 to visium spot diameter to reflect actual spot size
+* `doLeidenClusterIgraph()` deprecate param `resolution_parameter` in favor of `resolution`
+
+## Enhancements
+* `createGiottoVisiumObject()` append multiplicative scalefactor to get micron 
+  values from the current coordinate units during Visium object creation. 
+  Accessible through `instructions(gobject, "micron_scale")`
+
+# Giotto 4.1.3 (2024/10/27)
 
 ## New
 * Add `giottoToAnndataZarr()` to create a local anndata zarr folder and interact with the vitessceR package.
+* `reduceDims()` API function for dimension reductions
+* `runNMF()` implementation that works via RcppML
 
 ## Changes
 * `runWNN()` and `runIntegratedUMAP()` arguments were updated to make the function flexible to handle any number of modalities.
 * update `jackstrawPlot()` to make more flexible and efficient. Changed default params for `scaling`, `centering`, and `feats_to_use` to match `runPCA()`
+* change warning when reduction "feats" is selected in `runtSNE()` to error to avoid accidentally wiping the `giotto` object.
+
 
 # Giotto 4.1.2
 
@@ -26,7 +42,11 @@
 * move `progressr` and `jsonlite` dependencies to GiottoUtils v0.1.12
 * remove `reshape2` dependency.
 
+## Bug fixes
+* `processGiotto()` can now skip adjust step by default
+
 ## New
+* `identifyTMAcores()` for assigning IDs to tissue microarray spatial data.
 * `labelTransfer()` for transferring labels between giotto objects or subsets thereof. Supercedes `doClusterProjection()`
 
 # Giotto 4.1.1

@@ -230,11 +230,11 @@ reduceDims <- function(
     )
 
     if (set_seed) {
-        withSeed(
+        gwith_seed(
+            seed = seed_number,
             {
                 pca_res <- do.call(BiocSingular::runPCA, pca_param)
             },
-            seed = seed_number
         )
     } else {
         pca_res <- do.call(BiocSingular::runPCA, pca_param)
@@ -1757,7 +1757,7 @@ jackstrawPlot <- function(gobject,
     # create a random subset if random_subset is not NULL
     if (!is.null(random_subset)) {
         if (set_seed) {
-            withSeed(seed = seed_number, {
+            gwith_seed(seed = seed_number, {
                 random_selection <- sort(sample(
                     seq_len(ncol(expr_values)), random_subset
                 ))
@@ -1795,7 +1795,7 @@ jackstrawPlot <- function(gobject,
         }
 
         if (set_seed) {
-            withSeed(seed = seed_number, {
+            gwith_seed(seed = seed_number, {
                 jtest <- .perm_pa(
                     dat = expr_values,
                     iter = iter,
