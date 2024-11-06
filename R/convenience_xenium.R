@@ -1110,6 +1110,8 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
             
             # expand and update to per-image
             dfp_i <- list.files(dp_i, full.names = TRUE) # dir file paths
+            dfp_i <- dfp_i[!dir.exists(dfp_i)] # ignore dir matches 
+            # (such as the export directory)
             dfn_i <- sprintf("%s_%d", dn_i, seq_along(dfp_i)) # dir file names
             vmsg(.is_debug = TRUE, "* [img paths]:\n", paste(dfp_i, collapse = "\n"))
             vmsg(.is_debug = TRUE, "* [img names]:\n", paste(dfn_i, collapse = "\n"))
