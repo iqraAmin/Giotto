@@ -377,12 +377,20 @@ setMethod(
     ),
     load_images = "focus",
     load_aligned_images = NULL,
+    load_transcripts = TRUE,
     load_expression = FALSE,
     load_cellmeta = FALSE,
     instructions = NULL,
     verbose = NULL) {
+            load_transcripts <- as.logical(load_transcripts)
             load_expression <- as.logical(load_expression)
             load_cellmeta <- as.logical(load_cellmeta)
+            
+            if (!load_transcripts && !load_expression) {
+                warning(wrap_txt(
+                    "One of either transcripts or expression info should be loaded for a fully functioning object"
+                ))
+            }
 
             if (!is.null(load_aligned_images)) {
                 checkmate::assert_list(load_aligned_images)
@@ -418,14 +426,17 @@ setMethod(
 
 
             # transcripts
-            tx_list <- funs$load_transcripts(
-                path = transcript_path,
-                feat_type = feat_type,
-                split_keyword = split_keyword,
-                verbose = verbose
-            )
-            g <- setGiotto(g, tx_list, verbose = FALSE) # lists are fine
+            if (load_transcripts) {
+                tx_list <- funs$load_transcripts(
+                    path = transcript_path,
+                    feat_type = feat_type,
+                    split_keyword = split_keyword,
+                    verbose = verbose
+                )
+                g <- setGiotto(g, tx_list, verbose = FALSE) # lists are fine
+            }
 
+            
             # polys
             if (!is.null(load_bounds)) {
                 # replace convenient shortnames
@@ -444,19 +455,8 @@ setMethod(
                 }
                 g <- setGiotto(g, blist, verbose = FALSE)
             }
-
-
-            # feat metadata
-            fx <- funs$load_featmeta(
-                path = gene_panel_json_path,
-                # ID = symbols makes sense with the subcellular feat_IDs
-                gene_ids = "symbols",
-                # no dropcols
-                verbose = verbose
-            )
-            g <- setGiotto(g, fx, verbose = FALSE)
-
-
+            
+            
             # expression
             if (load_expression) {
                 ex <- funs$load_expression(
@@ -468,6 +468,17 @@ setMethod(
                 )
                 g <- setGiotto(g, ex)
             }
+
+
+            # feat metadata
+            fx <- funs$load_featmeta(
+                path = gene_panel_json_path,
+                # ID = symbols makes sense with the subcellular feat_IDs
+                gene_ids = "symbols",
+                # no dropcols
+                verbose = verbose
+            )
+            g <- setGiotto(g, fx, verbose = FALSE)
 
 
             # cell metadata
@@ -680,7 +691,8 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
     gpointslist <- createGiottoPoints(
         x = tx,
         feat_type = feat_type,
-        split_keyword = split_keyword
+        split_keyword = split_keyword,
+        verbose = FALSE
     )
 
     if (inherits(gpointslist, "list")) {
