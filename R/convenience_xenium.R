@@ -322,7 +322,8 @@ setMethod(
     negative_y = TRUE,
     flip_vertical = FALSE,
     flip_horizontal = FALSE,
-    verbose = NULL) {
+    verbose = NULL,
+    ...) {
             .xenium_image(
                 path = path,
                 name = name,
@@ -331,7 +332,8 @@ setMethod(
                 negative_y = negative_y,
                 flip_vertical = flip_vertical,
                 flip_horizontal = flip_horizontal,
-                verbose = verbose
+                verbose = verbose,
+                ...
             )
         }
         obj@calls$load_image <- img_fun
@@ -1156,6 +1158,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
                 flip_vertical = flip_vertical,
                 flip_horizontal = flip_horizontal,
                 verbose = verbose
+                ...
             )
             p()
             return(gimg)
