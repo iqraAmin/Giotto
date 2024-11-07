@@ -1385,9 +1385,9 @@ createGiottoXeniumObject <- function(xenium_dir,
     qv_threshold = 20,
     load_images = "focus",
     load_aligned_images = NULL,
-    load_transcripts = FALSE,
-    load_expression = TRUE,
-    load_cellmeta = TRUE,
+    load_transcripts = TRUE,
+    load_expression = FALSE,
+    load_cellmeta = FALSE,
     instructions = NULL,
     verbose = NULL) {
     x <- importXenium(xenium_dir)
