@@ -483,7 +483,7 @@ setMethod(
             # images
             if (!is.null(load_images)) {
                 load_images <- lapply(load_images, normalizePath)
-                img_focus_path <- normalizePath(img_focus_path)
+                img_focus_path <- normalizePath(img_focus_path, mustWork = FALSE)
                 
                 # [exception] handle focus image dir
                 is_focus <- load_images == "focus" | load_images == img_focus_path
