@@ -488,12 +488,8 @@ setMethod(
                 # [exception] handle focus image dir
                 is_focus <- load_images == "focus" | load_images == img_focus_path
                 # split the focus image dir away from other entries
-                focus_dir <- load_images[is_focus][[1]]
                 load_images <- load_images[!is_focus]
-                
-                # ignore any name the focus dir has
-                focus_dir <- as.character(focus_dir)
-                names(focus_dir) <- NULL
+                focus_dir <- img_focus_path
                 
                 focus_files <- list.files(focus_dir, full.names = TRUE)
                 nbound <- length(focus_files) - 1L
