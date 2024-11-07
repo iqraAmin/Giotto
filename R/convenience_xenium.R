@@ -493,22 +493,25 @@ setMethod(
 
             # images
             if (!is.null(load_images)) {
-                load_images <- lapply(load_images, normalizePath)
+                load_images <- lapply(load_images, normalizePath, mustWork = FALSE)
                 img_focus_path <- normalizePath(img_focus_path, mustWork = FALSE)
                 
                 # [exception] handle focus image dir
                 is_focus <- load_images == "focus" | load_images == img_focus_path
                 # split the focus image dir away from other entries
                 load_images <- load_images[!is_focus]
-                focus_dir <- img_focus_path
                 
-                focus_files <- list.files(focus_dir, full.names = TRUE)
-                nbound <- length(focus_files) - 1L
-                focus_names <- c("dapi", sprintf("bound%d", seq_len(nbound)))
-                names(focus_files) <- focus_names
-                
-                # append to rest of entries
-                load_images <- c(load_images, focus_files)
+                if (any(is_focus)) {
+                    focus_dir <- img_focus_path
+                    focus_files <- list.files(focus_dir, full.names = TRUE)
+                    focus_files <- focus_files[!dir.exists(focus_files)] # ignore matches to export dir
+                    nbound <- length(focus_files) - 1L
+                    focus_names <- c("dapi", sprintf("bound%d", seq_len(nbound)))
+                    names(focus_files) <- focus_names
+                    
+                    # append to rest of entries
+                    load_images <- c(load_images, focus_files)
+                }
                 
                 # ensure that input is list
                 checkmate::assert_list(load_images)
