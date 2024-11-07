@@ -1,4 +1,10 @@
 
+# Giotto 4.1.5
+
+## Enhancements
+* `createGiottoXeniumObject()` auto loading for morphology focus images, image directory loading, auto centroid calculation, allow skipping transcript loading
+
+
 # Giotto 4.1.4 (2024/10/30)
 
 ## Changes
