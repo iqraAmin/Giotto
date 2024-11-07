@@ -487,7 +487,8 @@ setMethod(
                     path = metadata_path,
                     verbose = verbose
                 )
-                g <- setGiotto(g, cx)
+                # verbose = FALSE to silence warning that meta is already generated
+                g <- setGiotto(g, cx, verbose = FALSE)
             }
 
 
@@ -553,12 +554,15 @@ setMethod(
             }
             
             # centroids
+            vmsg(.v = verbose, "calculating centroids")
             spat_units_to_calc <- list_spatial_info_names(g)
             g <- addSpatialCentroidLocations(g, 
                 poly_info = spat_units_to_calc,
                 provenance = as.list(spat_units_to_calc),
                 verbose = FALSE
             )
+            
+            vmsg(.v = verbose, "done")
 
             return(g)
         }
