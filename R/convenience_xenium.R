@@ -1190,6 +1190,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
         # check for existence of converted tiff file in output dir
         # fullpath of tiff to write
         tiff_path <- file.path(output_dir, basename(path))
+        tiff_path <- gsub(".ome.tif", ".tif", tiff_path)
         if (checkmate::test_file_exists(tiff_path)) {
             vmsg(.is_debug = TRUE, sprintf(
                 "converted tiff already present\n%s", tiff_path
