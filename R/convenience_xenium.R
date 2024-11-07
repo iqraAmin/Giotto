@@ -551,6 +551,11 @@ setMethod(
                 }
                 g <- setGiotto(g, aimglist)
             }
+            
+            # centroids
+            g <- addSpatialCentroidLocations(
+                g, poly_info = list_spatial_info_names(g)[[1]]
+            )
 
             return(g)
         }
