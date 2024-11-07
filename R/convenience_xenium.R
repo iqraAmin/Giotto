@@ -553,8 +553,11 @@ setMethod(
             }
             
             # centroids
-            g <- addSpatialCentroidLocations(
-                g, poly_info = list_spatial_info_names(g)[[1]]
+            spat_units_to_calc <- list_spatial_info_names(g)
+            g <- addSpatialCentroidLocations(g, 
+                poly_info = spat_units_to_calc,
+                provenance = as.list(spat_units_to_calc),
+                verbose = FALSE
             )
 
             return(g)
