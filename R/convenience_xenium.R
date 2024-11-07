@@ -384,12 +384,6 @@ setMethod(
             load_expression <- as.logical(load_expression)
             load_cellmeta <- as.logical(load_cellmeta)
 
-            if (!is.null(load_images)) {
-                checkmate::assert_list(load_images)
-                if (is.null(names(load_images))) {
-                    stop("'load_images' must be a named list of filepaths\n")
-                }
-            }
             if (!is.null(load_aligned_images)) {
                 checkmate::assert_list(load_aligned_images)
                 if (is.null(names(load_aligned_images))) {
@@ -487,28 +481,34 @@ setMethod(
 
 
             # images
-            load_images <- lapply(load_images, normalizePath)
-            img_focus_path <- normalizePath(img_focus_path)
-            
-            # [exception] handle focus image dir
-            is_focus <- load_images == "focus" | load_images == img_focus_path
-            # split the focus image dir away from other entries
-            focus_dir <- load_images[is_focus][[1]]
-            load_images <- load_images[!is_focus]
-            
-            # ignore any name the focus dir has
-            focus_dir <- as.character(focus_dir)
-            names(focus_dir) <- NULL
-            
-            focus_files <- list.files(focus_dir, full.names = TRUE)
-            nbound <- length(focus_files) - 1L
-            focus_names <- c("dapi", sprintf("bound%d", seq_len(nbound)))
-            names(focus_files) <- focus_names
-            
-            # append to rest of entries
-            load_images <- c(load_images, focus_files)
-            
             if (!is.null(load_images)) {
+                load_images <- lapply(load_images, normalizePath)
+                img_focus_path <- normalizePath(img_focus_path)
+                
+                # [exception] handle focus image dir
+                is_focus <- load_images == "focus" | load_images == img_focus_path
+                # split the focus image dir away from other entries
+                focus_dir <- load_images[is_focus][[1]]
+                load_images <- load_images[!is_focus]
+                
+                # ignore any name the focus dir has
+                focus_dir <- as.character(focus_dir)
+                names(focus_dir) <- NULL
+                
+                focus_files <- list.files(focus_dir, full.names = TRUE)
+                nbound <- length(focus_files) - 1L
+                focus_names <- c("dapi", sprintf("bound%d", seq_len(nbound)))
+                names(focus_files) <- focus_names
+                
+                # append to rest of entries
+                load_images <- c(load_images, focus_files)
+                
+                # ensure that input is list
+                checkmate::assert_list(load_images)
+                if (is.null(names(load_images))) {
+                    stop("'load_images' must be a named list of filepaths\n")
+                }
+                
                 imglist <- list()
                 imnames <- names(load_images)
                 for (impath_i in seq_along(load_images)) {
