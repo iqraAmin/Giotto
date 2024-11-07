@@ -1157,7 +1157,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
                 negative_y = negative_y,
                 flip_vertical = flip_vertical,
                 flip_horizontal = flip_horizontal,
-                verbose = verbose
+                verbose = verbose,
                 ...
             )
             p()
