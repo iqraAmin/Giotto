@@ -506,7 +506,7 @@ setMethod(
                 is_focus_dir <- is_focus & is_dir
                 
                 # handle matches to single focus images instead of a directory
-                names(load_images[is_focus_image]) <- "dapi"
+                names(load_images)[is_focus_image] <- "dapi"
                 
                 # [exception] handle focus image dir
                 if (any(is_focus_dir)) {
