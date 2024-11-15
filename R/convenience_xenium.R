@@ -500,10 +500,15 @@ setMethod(
                 # replace shortname
                 load_images[load_images == "focus"] <- img_focus_path
                 
-                # [exception] handle focus image dir
-                is_focus_dir <- load_images == img_focus_path & # exists?
-                    dir.exists(img_focus_path) # and is directory?
+                is_dir <- dir.exists(img_focus_path)
+                is_focus <- load_images == img_focus_path
+                is_focus_image <- is_focus & !is_dir
+                is_focus_dir <- is_focus & is_dir
                 
+                # handle matches to single focus images instead of a directory
+                names(load_images[is_focus_image]) <- "dapi"
+                
+                # [exception] handle focus image dir
                 if (any(is_focus_dir)) {
                     # split the focus image dir away from other entries
                     load_images <- load_images[!is_focus_dir]
