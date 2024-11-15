@@ -497,15 +497,20 @@ setMethod(
                 load_images <- lapply(load_images, normalizePath, mustWork = FALSE)
                 img_focus_path <- normalizePath(img_focus_path, mustWork = FALSE)
                 
-                # [exception] handle focus image dir
-                is_focus <- load_images == "focus" | load_images == img_focus_path
-                # split the focus image dir away from other entries
-                load_images <- load_images[!is_focus]
+                # replace shortname
+                load_images[load_images == "focus"] <- img_focus_path
                 
-                if (any(is_focus)) {
+                # [exception] handle focus image dir
+                is_focus_dir <- load_images == img_focus_path & # exists?
+                    dir.exists(img_focus_path) # and is directory?
+                
+                if (any(is_focus_dir)) {
+                    # split the focus image dir away from other entries
+                    load_images <- load_images[!is_focus_dir]
                     focus_dir <- img_focus_path
                     focus_files <- list.files(focus_dir, full.names = TRUE)
-                    focus_files <- focus_files[!dir.exists(focus_files)] # ignore matches to export dir
+                    # ignore matches to export dir (if it is a subdirectory)
+                    focus_files <- focus_files[!dir.exists(focus_files)] 
                     if (length(focus_files) > 0L) {
                         nbound <- length(focus_files) - 1L
                         focus_names <- c(
