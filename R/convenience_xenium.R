@@ -505,22 +505,36 @@ setMethod(
             if (!is.null(load_images)) {
                 load_images <- lapply(load_images, normalizePath, mustWork = FALSE)
                 img_focus_path <- normalizePath(img_focus_path, mustWork = FALSE)
-
+                
+                # replace shortname
+                load_images[load_images == "focus"] <- img_focus_path
+                
+                is_dir <- dir.exists(img_focus_path)
+                is_focus <- load_images == img_focus_path
+                is_focus_image <- is_focus & !is_dir
+                is_focus_dir <- is_focus & is_dir
+                
+                # handle matches to single focus images instead of a directory
+                names(load_images)[is_focus_image] <- "dapi"
+                
                 # [exception] handle focus image dir
-                is_focus <- load_images == "focus" | load_images == img_focus_path
-                # split the focus image dir away from other entries
-                load_images <- load_images[!is_focus]
-
-                if (any(is_focus)) {
+                if (any(is_focus_dir)) {
+                    # split the focus image dir away from other entries
+                    load_images <- load_images[!is_focus_dir]
                     focus_dir <- img_focus_path
                     focus_files <- list.files(focus_dir, full.names = TRUE)
-                    focus_files <- focus_files[!dir.exists(focus_files)] # ignore matches to export dir
-                    nbound <- length(focus_files) - 1L
-                    focus_names <- c("dapi", sprintf("bound%d", seq_len(nbound)))
-                    names(focus_files) <- focus_names
-
-                    # append to rest of entries
-                    load_images <- c(load_images, focus_files)
+                    # ignore matches to export dir (if it is a subdirectory)
+                    focus_files <- focus_files[!dir.exists(focus_files)] 
+                    if (length(focus_files) > 0L) {
+                        nbound <- length(focus_files) - 1L
+                        focus_names <- c(
+                            "dapi", sprintf("bound%d", seq_len(nbound))
+                        )
+                        names(focus_files) <- focus_names
+                        
+                        # append to rest of entries
+                        load_images <- c(load_images, focus_files)
+                    }
                 }
 
                 # ensure that input is list
