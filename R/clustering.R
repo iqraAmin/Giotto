@@ -3309,12 +3309,18 @@ getDendrogramSplits <- function(
 #' one of the sets to the other based on KNN similarity voting in that space.
 #' @param x target object
 #' @param y source object
+#' @param spat_unit spatial unit. A character vector of 2 can also be passed
+#' for x (1) and y (2). Setting defaults with `activeSpatUnit()` may be easier
+#' @param feat_type feature type. A character vector of 2 can also be passed
+#' for x (1) and y (2). Setting defaults with `activeFeatType()` may be easier
 #' @param source_cell_ids cell/spatial IDs with the source labels to transfer
 #' @param target_cell_ids cell/spatial IDs to transfer the labels to.
 #' IDs from `source_cell_ids` are always included as well.
 #' @param labels metadata column in source with labels to transfer
 #' @param k number of k-neighbors to train a KNN classifier
 #' @param name metadata column in target to apply the full set of labels to
+#' @param integration_method character. Integration method to use when
+#' transferring labels. Options are "none" (default) and "harmony".
 #' @param prob output knn probabilities together with label predictions
 #' @param reduction reduction on cells or features (default = "cells")
 #' @param reduction_method shared reduction method (default = "pca" space)
@@ -3364,45 +3370,187 @@ setGeneric(
     function(x, y, ...) standardGeneric("labelTransfer")
 )
 
+
+.lab_trnsfr_harmony <- function(x, y,
+    expression_values = "raw",
+    dimensions_to_use = 1:10,
+    spat_unit = NULL,
+    feat_type = NULL,
+    filter_params = list(
+        expression_threshold = 1, 
+        feat_det_in_min_cells = 1, 
+        min_det_feats_per_cell = 10
+    ),
+    normalize_params = list(),
+    use_hvf = TRUE,
+    pca_params = list(),
+    integration_params = list(),
+    ... # passes to labelTransfer
+) {
+    # NSE vars
+    cell_ID <- transfer <- transfer_prob <- NULL
+    
+    # match features
+    ufids <- intersect(featIDs(x), featIDs(y))
+    if (length(ufids) == 0L) {
+        stop("labelTransfer harmony: No common features between `x` and `y`",
+             call. = FALSE)
+    }
+    
+    # get needed subobjects
+    xdata <- x[[
+        c("expression", "spatial_locs"), 
+        expression_values, 
+        spat_unit = spat_unit[[1]],
+        feat_type = feat_type[[1]],
+    ]]
+    ydata <- y[[
+        c("expression", "spatial_locs"), 
+        expression_values, 
+        spat_unit = spat_unit[[2]],
+        feat_type = feat_type[[2]],
+    ]]
+    ymeta <- y[[
+        "cell_metadata",
+        spat_unit = spat_unit[[2]],
+        feat_type = feat_type[[2]]
+    ]]
+    
+    # harmonize nesting
+    objName(xdata) <- rep("join", length(xdata))
+    objName(ydata) <- rep("join", length(ydata))
+    ydata <- c(ydata, ymeta)
+    spatUnit(xdata) <- rep("join", length(xdata))
+    featType(xdata) <- rep("join", length(xdata))
+    spatUnit(ydata) <- rep("join", length(ydata))
+    featType(ydata) <- rep("join", length(ydata))
+    
+    # generate temp objects
+    xj <- setGiotto(giotto(initialize = FALSE), xdata, verbose = FALSE) 
+    yj <- setGiotto(giotto(initialize = FALSE), ydata, verbose = FALSE)
+    
+    # join on intersected feats
+    j <- joinGiottoObjects(
+        list(xj[ufids], yj[ufids]), 
+        gobject_names = c("x", "y")
+    )
+    
+    # process
+    j <- do.call(
+        normalizeGiotto, args = c(list(gobject = j), normalize_params)
+    )
+    if (use_hvf) {
+        j <- calculateHVF(j)
+        pca_params$feats_to_use = pca_params$feats_to_use %null% "hvf"
+    } else {
+        pca_params$feats_to_use = NULL
+    }
+    j <- do.call(runPCA, args = c(list(gobject = j), pca_params))
+    
+    # TODO determine dims to use via cumvar >= 30%
+    
+    # harmony
+    integration_params$name <- "harmony"
+    integration_params$vars_use = "list_ID"
+    integration_params$dim_reduction_name = "pca"
+    integration_params$dimensions_to_use = dimensions_to_use
+    
+    j <- do.call(runGiottoHarmony, c(list(gobject = j), integration_params))
+    
+    transfer_args <- list(
+        x = j,
+        source_cell_ids = spatIDs(j, subset = list_ID == "y"),
+        name = "transfer",
+        dimensions_to_use = dimensions_to_use,
+        reduction = "cells",
+        reduction_method = "harmony",
+        reduction_name = "harmony",
+        ...
+    )
+    j <- do.call(labelTransfer, transfer_args)
+    
+    res <- pDataDT(j)
+    res <- res[list_ID == "x"]
+    res[, cell_ID := gsub("^x-", "", cell_ID)]
+    res <- res[, .(cell_ID, transfer, transfer_prob)]
+    
+    x <- addCellMetadata(x,
+        new_metadata = res, 
+        by_column = TRUE, 
+        column_cell_ID = "cell_ID"
+    )
+    return(x)
+}
+
+
+
 #' @rdname labelTransfer
 #' @export
 setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
         x, y,
-        spat_unit = NULL,
-        feat_type = NULL,
         labels,
         k = 10,
         name = paste0("trnsfr_", labels),
+        integration_method = c("none", "harmony"),
         prob = TRUE,
         reduction = "cells",
         reduction_method = "pca",
         reduction_name = "pca",
         dimensions_to_use = 1:10,
+        spat_unit = NULL,
+        feat_type = NULL,
         return_gobject = TRUE,
         ...) {
-    # NSE vars
-    temp_name <- cell_ID <- temp_name_prob <- NULL
 
     package_check(pkg_name = "FNN", repository = "CRAN")
-    spat_unit <- set_default_spat_unit(x, spat_unit = spat_unit)
-    feat_type <- set_default_feat_type(x,
-        spat_unit = spat_unit, feat_type = feat_type
+    
+    integration_method <- match.arg(integration_method, choices = c(
+        "none", "harmony"
+    ))
+    
+    if (!labels %in% colnames(pDataDT(y))) {
+        stop("`labels` not found in cell metadata of `y`", call. = FALSE)
+    }
+    
+    # norm su and ft lengths
+    if (length(spat_unit) == 1L) {
+        spat_unit <- rep(spat_unit, 2L)
+    }
+    if (length(feat_type) == 1L) {
+        feat_type <- rep(feat_type, 2L)
+    }
+    
+    if (integration_method == "harmony") {
+        a <- get_args_list(...)
+        return(.lab_transfr_harmony(...))
+    }
+    
+    # NSE vars
+    temp_name <- cell_ID <- temp_name_prob <- NULL
+    
+    su1 <- set_default_spat_unit(x, spat_unit = spat_unit[[1]])
+    su2 <- set_default_spat_unit(y, spat_unit = spat_unit[[2]])
+    ft1 <- set_default_feat_type(
+        x, spat_unit = su1, feat_type = feat_type[[1]]
+    )
+    ft2 <- set_default_feat_type(
+        y, spat_unit = su2, feat_type = feat_type[[2]]
     )
 
     # get data
     cx_src <- getCellMetadata(y,
-        spat_unit = spat_unit,
-        feat_type = feat_type,
+        spat_unit = su2,
+        feat_type = ft2,
         output = "data.table"
     )
     cx_tgt <- getCellMetadata(x,
-        spat_unit = spat_unit,
-        feat_type = feat_type,
+        spat_unit = su1,
+        feat_type = ft1,
         output = "data.table"
     )
     dim_coord <- getDimReduction(x,
-        spat_unit = spat_unit,
-        feat_type = feat_type,
+        spat_unit = su1,
+        feat_type = ft1,
         reduction = reduction,
         reduction_method = reduction_method,
         name = reduction_name,
@@ -3479,8 +3627,8 @@ setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
 
     if (return_gobject) {
         x <- addCellMetadata(x,
-            spat_unit = spat_unit,
-            feat_type = feat_type,
+            spat_unit = su1,
+            feat_type = ft1,
             new_metadata = cx_tgt,
             by_column = TRUE,
             column_cell_ID = "cell_ID"
