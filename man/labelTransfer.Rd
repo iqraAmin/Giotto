@@ -10,16 +10,17 @@ voting}
 \S4method{labelTransfer}{giotto,giotto}(
   x,
   y,
-  spat_unit = NULL,
-  feat_type = NULL,
   labels,
   k = 10,
   name = paste0("trnsfr_", labels),
+  integration_method = c("none", "harmony"),
   prob = TRUE,
   reduction = "cells",
   reduction_method = "pca",
   reduction_name = "pca",
   dimensions_to_use = 1:10,
+  spat_unit = NULL,
+  feat_type = NULL,
   return_gobject = TRUE,
   ...
 )
@@ -53,6 +54,9 @@ voting}
 
 \item{name}{metadata column in target to apply the full set of labels to}
 
+\item{integration_method}{character. Integration method to use when
+transferring labels. Options are "none" (default) and "harmony".}
+
 \item{prob}{output knn probabilities together with label predictions}
 
 \item{reduction}{reduction on cells or features (default = "cells")}
@@ -63,6 +67,12 @@ voting}
 
 \item{dimensions_to_use}{dimensions to use in shared reduction space
 (default = 1:10)}
+
+\item{spat_unit}{spatial unit. A character vector of 2 can also be passed
+for x (1) and y (2). Setting defaults with \code{activeSpatUnit()} may be easier}
+
+\item{feat_type}{feature type. A character vector of 2 can also be passed
+for x (1) and y (2). Setting defaults with \code{activeFeatType()} may be easier}
 
 \item{...}{
   Arguments passed on to \code{\link[FNN:knn]{FNN::knn}}
