@@ -3371,7 +3371,7 @@ setGeneric(
 )
 
 
-.lab_trnsfr_harmony <- function(x, y,
+.lab_transfer_harmony <- function(x, y,
     expression_values = "raw",
     dimensions_to_use = 1:10,
     spat_unit = NULL,
@@ -3522,7 +3522,7 @@ setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
     
     if (integration_method == "harmony") {
         a <- get_args_list(...)
-        return(.lab_transfr_harmony(...))
+        return(.lab_transfer_harmony(...))
     }
     
     # NSE vars
