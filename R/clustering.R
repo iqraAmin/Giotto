@@ -3522,7 +3522,7 @@ setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
     
     if (integration_method == "harmony") {
         a <- get_args_list(...)
-        return(.lab_transfer_harmony(...))
+        return(do.call(.lab_transfer_harmony, a))
     }
     
     # NSE vars
