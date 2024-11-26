@@ -3399,13 +3399,13 @@ setGeneric(
     
     # get needed subobjects
     xdata <- x[[
-        c("expression", "spatial_locs"), 
+        c("expression"), 
         expression_values, 
         spat_unit = spat_unit[[1]],
         feat_type = feat_type[[1]],
     ]]
     ydata <- y[[
-        c("expression", "spatial_locs"), 
+        c("expression"), 
         expression_values, 
         spat_unit = spat_unit[[2]],
         feat_type = feat_type[[2]],
