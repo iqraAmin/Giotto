@@ -3385,27 +3385,35 @@ setGeneric(
     use_hvf = TRUE,
     pca_params = list(),
     integration_params = list(),
+    verbose = NULL,
     ... # passes to labelTransfer
 ) {
     # NSE vars
     cell_ID <- transfer <- transfer_prob <- NULL
     
+    # turn off lower level updates
+    options("giotto.update_param" = FALSE)
+    on.exit({
+        options("giotto.update_param" = TRUE)
+    }, add = TRUE)
+        
+    vmsg(.v = verbose, "1. Creating temporary joined object...")
     # match features
     ufids <- intersect(featIDs(x), featIDs(y))
     if (length(ufids) == 0L) {
         stop("labelTransfer harmony: No common features between `x` and `y`",
              call. = FALSE)
     }
-    
+
     # get needed subobjects
     xdata <- x[[
-        c("expression"), 
+        "expression", 
         expression_values, 
         spat_unit = spat_unit[[1]],
         feat_type = feat_type[[1]],
     ]]
     ydata <- y[[
-        c("expression"), 
+        "expression", 
         expression_values, 
         spat_unit = spat_unit[[2]],
         feat_type = feat_type[[2]],
@@ -3417,34 +3425,72 @@ setGeneric(
     ]]
     
     # harmonize nesting
-    objName(xdata) <- rep("join", length(xdata))
-    objName(ydata) <- rep("join", length(ydata))
+    objName(xdata) <- rep("raw", length(xdata))
+    objName(ydata) <- rep("raw", length(ydata))
     ydata <- c(ydata, ymeta)
-    spatUnit(xdata) <- rep("join", length(xdata))
-    featType(xdata) <- rep("join", length(xdata))
-    spatUnit(ydata) <- rep("join", length(ydata))
-    featType(ydata) <- rep("join", length(ydata))
+    spatUnit(xdata) <- rep("cell", length(xdata))
+    featType(xdata) <- rep("rna", length(xdata))
+    spatUnit(ydata) <- rep("cell", length(ydata))
+    featType(ydata) <- rep("rna", length(ydata))
+    
+    dummy_sl_x <- data.table::data.table(
+        cell_ID = colnames(xdata[[1]][]),
+        sdimx = 0, sdimy = 0
+    ) |>
+        createSpatLocsObj(
+            name = "raw", spat_unit = "cell", verbose = FALSE
+        )
+    dummy_sl_y <- data.table::data.table(
+        cell_ID = colnames(ydata[[1]][]),
+        sdimx = 0, sdimy = 0
+    ) |>
+        createSpatLocsObj(
+            name = "raw", spat_unit = "cell", verbose = FALSE
+        )
+    dummy_instrs <- instructions(x)
+    
+    xdata <- c(xdata, dummy_sl_x)
+    ydata <- c(ydata, dummy_sl_y)
     
     # generate temp objects
-    xj <- setGiotto(giotto(initialize = FALSE), xdata, verbose = FALSE) 
-    yj <- setGiotto(giotto(initialize = FALSE), ydata, verbose = FALSE)
-    
+    xj <- setGiotto(giotto(instructions = dummy_instrs, initialize = FALSE), 
+                    xdata, verbose = FALSE)
+    yj <- setGiotto(giotto(instructions = dummy_instrs, initialize = FALSE), 
+                    ydata, verbose = FALSE)
+
     # join on intersected feats
     j <- joinGiottoObjects(
         list(xj[ufids], yj[ufids]), 
         gobject_names = c("x", "y")
     )
     
-    # process
-    j <- do.call(
-        normalizeGiotto, args = c(list(gobject = j), normalize_params)
+    # cleanup
+    rm(y, xj, yj, xdata, ydata, ymeta, dummy_sl_x, dummy_sl_y, dummy_instrs)
+
+    vmsg(.v = verbose, "2. Performing simple filter...")
+    j <- filterGiotto(j, 
+        expression_threshold = 1, 
+        min_det_feats_per_cell = 1, 
+        feat_det_in_min_cells = 1,
+        verbose = FALSE
     )
+    
+    vmsg(.v = verbose, "3. Running normalize...")
+    normalize_params$verbose <- FALSE
+    # process
+    j <- do.call(normalizeGiotto, 
+                 args = c(list(gobject = j), normalize_params)
+    )
+    
     if (use_hvf) {
+        vmsg(.v = verbose, "-- Calculating HVF...")
         j <- calculateHVF(j)
         pca_params$feats_to_use = pca_params$feats_to_use %null% "hvf"
     } else {
-        pca_params$feats_to_use = NULL
+        pca_params <- c(pca_params, list(feats_to_use = NULL))
     }
+    
+    vmsg(.v = verbose, "4. Running PCA...")
     j <- do.call(runPCA, args = c(list(gobject = j), pca_params))
     
     # TODO determine dims to use via cumvar >= 30%
@@ -3455,25 +3501,29 @@ setGeneric(
     integration_params$dim_reduction_name = "pca"
     integration_params$dimensions_to_use = dimensions_to_use
     
-    j <- do.call(runGiottoHarmony, c(list(gobject = j), integration_params))
-    
-    transfer_args <- list(
-        x = j,
-        source_cell_ids = spatIDs(j, subset = list_ID == "y"),
-        name = "transfer",
-        dimensions_to_use = dimensions_to_use,
-        reduction = "cells",
-        reduction_method = "harmony",
-        reduction_name = "harmony",
-        ...
+    vmsg(.v = verbose, "5. Generating shared Harmony embedding space...")
+    j <- do.call(runGiottoHarmony,
+                 c(list(gobject = j), integration_params)
     )
+    
+    # transfer
+    transfer_args <- list(...)
+    transfer_args$x <- j
+    transfer_args$source_cell_ids <- spatIDs(j, subset = list_ID == "y")
+    transfer_args$dimensions_to_use = dimensions_to_use
+    transfer_args$reduction = "cells"
+    transfer_args$reduction_method = "harmony"
+    transfer_args$reduction_name = "harmony"   
+    
+    vmsg(.v = verbose, "6. Performing label transfer...")
     j <- do.call(labelTransfer, transfer_args)
     
     res <- pDataDT(j)
     res <- res[list_ID == "x"]
     res[, cell_ID := gsub("^x-", "", cell_ID)]
-    res <- res[, .(cell_ID, transfer, transfer_prob)]
-    
+    tname <- transfer_args$name
+    res <- res[, .SD, .SDcols = c("cell_ID", tname, paste0(tname, "_prob"))]
+
     x <- addCellMetadata(x,
         new_metadata = res, 
         by_column = TRUE, 
@@ -3483,6 +3533,7 @@ setGeneric(
 }
 
 
+# ** giotto, giotto ####
 
 #' @rdname labelTransfer
 #' @export
@@ -3522,7 +3573,15 @@ setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
     
     if (integration_method == "harmony") {
         a <- get_args_list(...)
-        return(do.call(.lab_transfer_harmony, a))
+        a$integration_method <- NULL
+        # this function needs error handling or it locks the console
+        res <- tryCatch({
+            do.call(.lab_transfer_harmony, a)
+        }, error = function(e) {
+            stop(wrap_txtf("labelTransfer: harmony:\n%s", e$message), 
+                 call. = FALSE)
+        })
+        return(res)
     }
     
     # NSE vars
@@ -3638,6 +3697,9 @@ setMethod("labelTransfer", signature(x = "giotto", y = "giotto"), function(
         return(cx_tgt)
     }
 })
+
+
+# ** giotto, missing ####
 
 #' @rdname labelTransfer
 #' @export
