@@ -9,6 +9,7 @@
 * `importXenium()` `load_transcripts()` can now return a `data.table` rather than the `giottoPoints` representation
 
 ## New
+* `doMesmerSegmentation()` and `doStardistSegmentation()` segmentation wrappers
 * `.varexp()` internal for calculating SVD variance determined with support for partial SVDs
 * `.cumvar()` internal for calculating cumulative variance explained
 * re-export of `dotPlot()` from GiottoVisuals
