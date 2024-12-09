@@ -238,6 +238,7 @@ setMethod(
         dropcols = c(),
         qv_threshold = obj@qv,
         cores = determine_cores(),
+        output = c("giottoPoints", "data.table"),
         verbose = NULL) {
             .xenium_transcript(
                 path = path,
@@ -247,6 +248,7 @@ setMethod(
                 dropcols = dropcols,
                 qv_threshold = qv_threshold,
                 cores = cores,
+                output = output,
                 verbose = verbose
             )
         }
@@ -690,6 +692,7 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
         dropcols = c(),
         qv_threshold = 20,
         cores = determine_cores(),
+        output = c("giottoPoints", "data.table"),
         verbose = NULL) {
     if (missing(path)) {
         stop(wrap_txt(
@@ -704,6 +707,8 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
     vmsg(.v = verbose, .is_debug = TRUE, "[TX_READ] FMT =", e)
     vmsg(.v = verbose, .is_debug = TRUE, path)
 
+    output <- match.arg(output, choices = c("giottoPoints", "data.table"))
+    
     # read in as data.table
     a <- list(
         path = path,
@@ -726,6 +731,8 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
     y <- NULL # NSE var
     if (flip_vertical) tx[, y := -y]
 
+    if (output == "data.table") return(tx)
+    
     # create gpoints
     gpointslist <- createGiottoPoints(
         x = tx,
@@ -734,7 +741,8 @@ importXenium <- function(xenium_dir = NULL, qv_threshold = 20) {
         verbose = FALSE
     )
 
-    if (inherits(gpointslist, "list")) {
+    # enforce list
+    if (!inherits(gpointslist, "list")) {
         gpointslist <- list(gpointslist)
     }
 
