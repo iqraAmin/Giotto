@@ -3320,15 +3320,20 @@ getDendrogramSplits <- function(
 #' @param k number of k-neighbors to train a KNN classifier
 #' @param name metadata column in target to apply the full set of labels to
 #' @param integration_method character. Integration method to use when
-#' transferring labels. Options are "none" (default) and "harmony".
+#' transferring labels. Options are "none" (default) and "harmony". See section
+#' below for more info and params.
 #' @param prob output knn probabilities together with label predictions
 #' @param reduction reduction on cells or features (default = "cells")
 #' @param reduction_method shared reduction method (default = "pca" space)
 #' @param reduction_name name of shared reduction space (default name = "pca")
 #' @param dimensions_to_use dimensions to use in shared reduction space
 #' (default = 1:10)
-#' @returns object `x` with new transferred labels added to metadata
 #' @inheritDotParams FNN::knn -train -test -cl -k -prob
+#' @returns object `x` with new transferred labels added to metadata. If
+#' running on `x` and `y` objects, `integration_method = "harmony"`,
+#' `plot_join_labels = TRUE`, and `return_plot = TRUE` is set, output will
+#' be instead a named list of `gobject` (updated `x`), and `label_source_plot`
+#' and `label_target_plot` `ggplot2` objects
 #' @details
 #' This function trains a KNN classifier with [FNN::knn()].
 #' The training data is from object `y` or `source_cell_ids` subset in `x` and
@@ -3348,6 +3353,34 @@ getDendrogramSplits <- function(
 #' used to transfer labels from one set of annotated data to another dataset
 #' based on expression similarity after joining and integrating.
 #'
+#' # integration_method
+#' When running `labelTranfer()` on two `giotto` objects, an integration
+#' pipeline can also be run to align the two datasets together before the
+#' transfer. `integration_method = "harmony"` will make a temporary joined 
+#' object on shared features, filter to remove 0 values, run PCA, then harmony
+#' integration, before performing the label transfer from `y` to `x` on the
+#' integrated harmony embedding space. Additional params that can be used with
+#' this method are:\cr
+#' 
+#' * `source_cell_ids` - character. subset of `y` cells to use
+#' * `target_cell_ids` - character. subset of `x` cells to use
+#' * `expression_values` - character. expression values in `x` and `y` to use 
+#' to generate combined space. Default = `"raw"`
+#' * `use_hvf` - logical. whether to calculate highly variable features to use 
+#' for PCA calculation. Default = `TRUE`, but setting `FALSE` is recommended if
+#' any of `x` or `y` has roughly 1000 features or fewer
+#' * `plot_join_labels` - logical. Whether to plot source labels and final
+#' labels in the joine object UMAP.
+#' * `normalize_params` - named list. Additional params to pass to 
+#' `normalizeGiotto()` if desired.
+#' * `pca_params` - named list. Additional params to pass to `runPCA()` if
+#' desired.
+#' * `integration_params` - named list. Additional params to pass to 
+#' `runGiottoHarmony()` if desired.
+#' * `plot_params` - named list. Additional params to pass to `plotUMAP()` if
+#' desired. Only relevant when `plot_join_labels = TRUE`
+#' * `verbose` - verbosity
+#' 
 #' @examples
 #' g <- GiottoData::loadGiottoMini("visium")
 #' id_subset <- sample(spatIDs(g), 300)
@@ -3372,24 +3405,33 @@ setGeneric(
 
 
 .lab_transfer_harmony <- function(x, y,
+    source_cell_ids = NULL,
+    target_cell_ids = NULL,
     expression_values = "raw",
     dimensions_to_use = 1:10,
     spat_unit = NULL,
     feat_type = NULL,
-    filter_params = list(
-        expression_threshold = 1, 
-        feat_det_in_min_cells = 1, 
-        min_det_feats_per_cell = 10
-    ),
-    normalize_params = list(),
     use_hvf = TRUE,
+    plot_join_labels = FALSE,
+    normalize_params = list(),
     pca_params = list(),
     integration_params = list(),
+    plot_params = list(),
     verbose = NULL,
     ... # passes to labelTransfer
 ) {
     # NSE vars
     cell_ID <- transfer <- transfer_prob <- NULL
+
+    .check_plot_output <- function(pparam) {
+        direct_setting <- plot_params[[pparam]]
+        if (!is.null(direct_setting)) return(direct_setting)
+        any(instructions(x, pparam), instructions(y, pparam))
+    }
+    
+    .show_plot <- .check_plot_output("show_plot")
+    .return_plot <- .check_plot_output("return_plot")
+    .save_plot <- .check_plot_output("save_plot")
     
     # turn off lower level updates
     options("giotto.update_param" = FALSE)
@@ -3457,12 +3499,12 @@ setGeneric(
                     xdata, verbose = FALSE)
     yj <- setGiotto(giotto(instructions = dummy_instrs, initialize = FALSE), 
                     ydata, verbose = FALSE)
-
-    # join on intersected feats
-    j <- joinGiottoObjects(
-        list(xj[ufids], yj[ufids]), 
-        gobject_names = c("x", "y")
-    )
+    
+    xj <- subsetGiotto(xj, feat_ids = ufids, cell_ids = target_cell_ids)
+    yj <- subsetGiotto(yj, feat_ids = ufids, cell_ids = source_cell_ids)
+    
+    # join on intersected feats and specified cell_IDs
+    j <- joinGiottoObjects(list(xj, yj), gobject_names = c("x", "y"))
     
     # cleanup
     rm(y, xj, yj, xdata, ydata, ymeta, dummy_sl_x, dummy_sl_y, dummy_instrs)
@@ -3529,6 +3571,65 @@ setGeneric(
         by_column = TRUE, 
         column_cell_ID = "cell_ID"
     )
+    
+    # plot outputs
+    if (!any(.save_plot, .return_plot, .show_plot) && plot_join_labels) {
+        return(x) # return early if plotting not needed
+    }
+    
+    vmsg(.v = verbose, "7. plot_join_labels = TRUE: Running UMAP...")
+    
+    j <- runUMAP(j, 
+        dim_reduction_to_use = "harmony",
+        dim_reduction_name = "harmony",
+        name = "harmony_umap",
+        dimensions_to_use = dimensions_to_use
+    )
+    
+    plotlabs <- unique(res[[tname]])
+    default_colors <- getRainbowColors(
+        n = length(plotlabs), slim = c(0.5, 1), vlim = c(0.3, 1)
+    )
+    names(default_colors) <- plotlabs
+    
+    plot_params$gobject <- j
+    plot_params$dim_reduction_name <- "harmony_umap"
+    plot_params$color_as_factor <- TRUE
+    plot_params$point_size <- plot_params$point_size %null% 0.5
+    plot_params$point_border_stroke <- plot_params$point_border_stroke %null% 0
+    plot_params$cell_color_code <-
+        plot_params$cell_color_code %null% default_colors
+        
+    p1_params <- p2_params <- plot_params
+    
+    p1_params$cell_color <- transfer_args$labels
+    p1_params$select_cells <- spatIDs(j, subset = list_ID == "y")
+    p1_params$other_point_size <- p1_params$other_point_size %null% 0.3
+    p1_params$show_plot <- FALSE
+    p1_params$return_plot <- TRUE
+    p1_params$title <- "source labels"
+    
+    p2_params$cell_color <- tname
+    p2_params$show_plot <- FALSE
+    p2_params$return_plot <- TRUE
+    p2_params$title <- "final labels"
+    
+    plot_list <- list(label_source_plot = do.call(plotUMAP, p1_params), 
+                      label_final_plot = do.call(plotUMAP, p2_params))
+    
+    if (.show_plot) {
+        print(plot_grid(plotlist = plot_list))
+    } 
+    if (.save_plot) {
+        plot_output_handler(x, plot_list[[1]],
+            save_plot = .save_plot,
+            default_save_name = "transferLabels_source",
+        )
+    }
+    if (.return_plot) {
+        x <- c(list(gobject = x), plot_list)
+    }
+    
     return(x)
 }
 
